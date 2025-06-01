@@ -202,7 +202,7 @@ def crawl4ai(url: str):
 def researcher():
     model = lms.llm()
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    chat = lms.Chat(f"You are a task focused AI researcher. Current date and time: {now}. Immediately start researching. Carefully fulfill every step of the research plan, search online multiple times to make sure you get the best results. Save all knowledge you find in the research knowledge base. After crawling a webpage, immediately save all knowledge you find and then recall all knowledge, then get the current step and continue. Save every bit of information you find using the memory tool. Recall all knowledge you have saved when compiling a final report.")
+    chat = lms.Chat(f"You are a task focused AI researcher. Current date and time: {now}. Do not stop untill all steps are completed. Immediately start researching. Carefully fulfill every step of the research plan, search online multiple times to make sure you get the best results. Save all knowledge you find in the research knowledge base. After crawling a webpage, immediately save all knowledge you find and then recall all knowledge, then get the current step and continue. Save every bit of information you find using the memory tool. Recall all knowledge you have saved when compiling a final report.")
     steps = get_all_steps()
     first_step_text = f"Here is the first step of the research plan:\n{steps[0]}\nAfter completing this step, move on to the next step. Dont forget to save all knowledge you find in the research knowledge base. Recall all knowledge you have saved when compiling a final report."
     chat.add_user_message(first_step_text)
