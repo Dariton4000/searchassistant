@@ -186,6 +186,26 @@ async def crawl4aiasync(url: str):
         )
         return(result.markdown)
 
+def create_report(title: str, content: str, sources: list):
+    """Generates a final report in markdown format.
+
+    Args:
+        title: The title of the report. Will also be used for the file name combined with the current date and time for a unique file name.
+        content: The content of the report.
+        sources: A list of sources used in the report.
+    Saves:
+        The final report in markdown format into reports/.
+    Returns:
+        The file name of the report for the AI to tell the user where to find it.
+    """
+    report_content = f"# {title}\n\n{content}\n\n## Sources\n"
+    for source in sources:
+        report_content += f"- {source}\n"
+    report_file = Path("reports") / f"{title}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
+    with report_file.open("w") as f:
+        f.write(report_content)
+    print(f"Report saved to {report_file}")
+    return f"Report saved to {report_file}"
 
 def crawl4ai(url: str):
     """Crawls a given URL and returns the text content.
@@ -202,7 +222,7 @@ def crawl4ai(url: str):
 def researcher():
     model = lms.llm()
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    chat = lms.Chat(f"You are a task focused AI researcher. Current date and time: {now}. Do not stop until all steps are completed. Immediately start researching. Carefully fulfill every step of the research plan, search online multiple times to make sure you get the best results. Save all knowledge you find in the research knowledge base. After crawling a webpage, immediately save all knowledge you find and then recall all knowledge, then get the current step and continue. Save every bit of information you find using the memory tool. Recall all knowledge you have saved when compiling a final report.")
+    chat = lms.Chat(f"You are a task focused AI researcher. Current date and time: {now}. Do not stop until all steps are completed. Immediately start researching. Carefully fulfill every step of the research plan, search online multiple times to make sure you get the best results. Save all knowledge you find in the research knowledge base. After crawling a webpage, immediately save all knowledge you find and then recall all knowledge, then get the current step and continue. Save every bit of information you find using the memory tool. Recall all knowledge you have saved when compiling a final report. Save the final report in markdown formating using the create_report tool.")
     steps = get_all_steps()
     first_step_text = f"Here is the first step of the research plan:\n{steps[0]}\nAfter completing this step, move on to the next step. Dont forget to save all knowledge you find in the research knowledge base. Recall all knowledge you have saved when compiling a final report."
     chat.add_user_message(first_step_text)
@@ -210,7 +230,7 @@ def researcher():
     print("Bot: ", end="", flush=True)
     model.act(
         chat,
-        [next_step, get_current_step, duckduckgo_search, get_all_steps, save_knowledge, get_all_knowledge, crawl4ai],
+        [next_step, get_current_step, duckduckgo_search, get_all_steps, save_knowledge, get_all_knowledge, crawl4ai, create_report],
         on_message=chat.append,
         on_prediction_fragment=print_fragment,
     )
@@ -229,7 +249,7 @@ def researcher():
         print("Bot: ", end="", flush=True)
         model.act(
             chat,
-            [next_step, get_current_step, duckduckgo_search, get_all_steps, save_knowledge, get_all_knowledge, crawl4ai],
+            [next_step, get_current_step, duckduckgo_search, get_all_steps, save_knowledge, get_all_knowledge, crawl4ai, create_report],
             on_message=chat.append,
             on_prediction_fragment=print_fragment,
         )
@@ -245,11 +265,16 @@ def main():
     PLAN_DIR.mkdir(exist_ok=True)   # Create the directory if it doesn't exist
     KNOWLEDGE_DIR = Path("research_knowledge")   # Directory to store research knowledge
     KNOWLEDGE_DIR.mkdir(exist_ok=True)   # Create the directory if it doesn't exist
+    REPORT_DIR = Path("reports")   # Directory to store final reports
+    REPORT_DIR.mkdir(exist_ok=True)   # Create the directory if it doesn't exist
     # Deletes any existing files in the directory
     for file in PLAN_DIR.glob("*.json"):
         file.unlink()
     # for Knowledge as well
     for file in KNOWLEDGE_DIR.glob("*.json"):
+        file.unlink()
+    # for Reports as well
+    for file in REPORT_DIR.glob("*.md"):
         file.unlink()
     model = lms.llm()
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
