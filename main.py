@@ -7,6 +7,7 @@ from datetime import datetime
 from duckduckgo_search import DDGS
 import asyncio
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
+import re
 
 # Todo:
 # - pause .act durring question asking, so that the user can answer the question and then continue with the next step.
@@ -173,6 +174,42 @@ def duckduckgo_search(search_query: str) -> str:
     print(results)
     return json.dumps(results)
 
+
+def get_wikipedia_page(page: str) -> str:
+    """
+    Get content from a Wikipedia page.
+    If no exact match is found, it will return a list of simular pages.
+    
+    Args:
+        page: Exact title of the Wikipedia page
+            
+    Returns:
+        Page content as plain text
+    """
+    url = 'https://en.wikipedia.org/w/api.php'
+    params = {
+        'action': 'query',
+        'format': 'json',
+        'prop': 'extracts',
+        'explaintext': True,
+        'titles': page
+    }
+    
+    response = requests.get(url, params=params, timeout=10)
+    response.raise_for_status()
+    
+    data = response.json()
+    pages = data.get('query', {}).get('pages', {})
+        
+    if not pages:
+        result = "No page found."
+    else:
+        page_data = next(iter(pages.values()))
+        result = page_data.get('extract', "No content found for the given page.")
+    
+    # Note: Context will be displayed after the full response is complete
+    return result
+
 async def crawl4aiasync(url: str):
     browser_conf = BrowserConfig(headless=True)  # or False to see the browser
     run_conf = CrawlerRunConfig(
@@ -186,7 +223,7 @@ async def crawl4aiasync(url: str):
         )
         return(result.markdown)
 
-def create_report(title: str, content: str, sources: list):
+def create_report(title: str, content: str, sources: list) -> str:
     """Generates a final report in markdown format.
 
     Args:
@@ -196,16 +233,29 @@ def create_report(title: str, content: str, sources: list):
     Saves:
         The final report in markdown format into reports/.
     Returns:
-        The file name of the report for the AI to tell the user where to find it.
+        The file name of the report for the AI to tell the user where to find it or an error message.
     """
-    report_content = f"# {title}\n\n{content}\n\n## Sources\n"
+    # Validate and sanitize title
+    sanitized_title = re.sub(r'[^\\w\\s-]', '', title).strip().replace(' ', '_')
+    if not sanitized_title:
+        return "Error: Report title cannot be empty or contain only special characters."
+
+    report_content = f"# {sanitized_title}\\n\\n{content}\\n\\n## Sources\\n"
     for source in sources:
-        report_content += f"- {source}\n"
-    report_file = Path("reports") / f"{title}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
-    with report_file.open("w") as f:
-        f.write(report_content)
-    print(f"Report saved to {report_file}")
-    return f"Report saved to {report_file}"
+        report_content += f"- {source}\\n"
+
+    reports_dir = Path("reports")
+    try:
+        reports_dir.mkdir(parents=True, exist_ok=True)
+        report_file = reports_dir / f"{sanitized_title}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
+        with report_file.open("w") as f:
+            f.write(report_content)
+        print(f"Report saved to {report_file}")
+        return f"Report saved to {report_file}"
+    except IOError as e:
+        error_message = f"Error writing report to file: {e}"
+        print(error_message)
+        return error_message
 
 def crawl4ai(url: str):
     """Crawls a given URL and returns the text content.
@@ -230,7 +280,7 @@ def researcher():
     print("Bot: ", end="", flush=True)
     model.act(
         chat,
-        [next_step, get_current_step, duckduckgo_search, get_all_steps, save_knowledge, get_all_knowledge, crawl4ai, create_report],
+        [next_step, get_current_step, duckduckgo_search, get_all_steps, save_knowledge, get_all_knowledge, crawl4ai, create_report, get_wikipedia_page],
         on_message=chat.append,
         on_prediction_fragment=print_fragment,
     )
@@ -249,7 +299,7 @@ def researcher():
         print("Bot: ", end="", flush=True)
         model.act(
             chat,
-            [next_step, get_current_step, duckduckgo_search, get_all_steps, save_knowledge, get_all_knowledge, crawl4ai, create_report],
+            [next_step, get_current_step, duckduckgo_search, get_all_steps, save_knowledge, get_all_knowledge, crawl4ai, create_report,get_wikipedia_page],
             on_message=chat.append,
             on_prediction_fragment=print_fragment,
         )
@@ -272,9 +322,6 @@ def main():
         file.unlink()
     # for Knowledge as well
     for file in KNOWLEDGE_DIR.glob("*.json"):
-        file.unlink()
-    # for Reports as well
-    for file in REPORT_DIR.glob("*.md"):
         file.unlink()
     model = lms.llm()
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
