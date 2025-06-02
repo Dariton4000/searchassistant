@@ -236,13 +236,13 @@ def create_report(title: str, content: str, sources: list) -> str:
         The file name of the report for the AI to tell the user where to find it or an error message.
     """
     # Validate and sanitize title
-    sanitized_title = re.sub(r'[^\\w\\s-]', '', title).strip().replace(' ', '_')
+    sanitized_title = re.sub(r'[^\w\s-]', '', title).strip().replace(' ', '_')
     if not sanitized_title:
         return "Error: Report title cannot be empty or contain only special characters."
 
-    report_content = f"# {sanitized_title}\\n\\n{content}\\n\\n## Sources\\n"
+    report_content = f"# {sanitized_title}\n\n{content}\n\n## Sources\n"
     for source in sources:
-        report_content += f"- {source}\\n"
+        report_content += f"- {source}\n"
 
     reports_dir = Path("reports")
     try:
