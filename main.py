@@ -10,10 +10,10 @@ from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
 import re
 
 # Todo:
-# - pause .act durring question asking, so that the user can answer the question and then continue with the next step.
-# - add Wikipedia search functionallity
-# - add better next_step handeling for example when current step is not correct
-# - add ability for researcher to modefie the research plan, for example to add new steps or remove existing ones
+# - pause .act during question asking, so that the user can answer the question and then continue with the next step.
+# - add Wikipedia search functionality
+# - add better next_step handling for example when current step is not correct
+# - add ability for researcher to modify the research plan, for example to add new steps or remove existing ones
 # - add function to save final report with markdown into /final_report directory with date and time in the filename
 
 
