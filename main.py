@@ -272,7 +272,7 @@ def crawl4ai(url: str):
 def researcher():
     model = lms.llm()
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    chat = lms.Chat(f"You are a task focused AI researcher. Current date and time: {now}. Do not stop until all steps are completed. Immediately start researching. Carefully fulfill every step of the research plan, search online multiple times to make sure you get the best results. Save all knowledge you find in the research knowledge base. After crawling a webpage, immediately save all knowledge you find and then recall all knowledge, then get the current step and continue. Save every bit of information you find using the memory tool. Recall all knowledge you have saved when compiling a final report. Save the final report in markdown formating using the create_report tool.")
+    chat = lms.Chat(f"You are a task focused AI researcher. Current date and time: {now}. Do not stop until all steps are completed. Immediately start researching. Carefully fulfill every step of the research plan, search online multiple times to make sure you get the best results. Save all knowledge you find in the research knowledge base, treat it like your Memory. After crawling a webpage, immediately save all knowledge you find and then recall all knowledge, then get the current step and continue. Save every bit of information you find using the memory tool. Recall all knowledge you have saved when compiling a final report. Save the final report in markdown formating using the create_report tool.")
     steps = get_all_steps()
     first_step_text = f"Here is the first step of the research plan:\n{steps[0]}\nAfter completing this step, move on to the next step. Dont forget to save all knowledge you find in the research knowledge base. Recall all knowledge you have saved when compiling a final report."
     chat.add_user_message(first_step_text)
@@ -299,7 +299,7 @@ def researcher():
         print("Bot: ", end="", flush=True)
         model.act(
             chat,
-            [next_step, get_current_step, duckduckgo_search, get_all_steps, save_knowledge, get_all_knowledge, crawl4ai, create_report,get_wikipedia_page],
+            [next_step, get_current_step, duckduckgo_search, get_all_steps, save_knowledge, get_all_knowledge, crawl4ai, create_report, get_wikipedia_page],
             on_message=chat.append,
             on_prediction_fragment=print_fragment,
         )
@@ -326,7 +326,7 @@ def main():
     model = lms.llm()
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     model.act(
-    f"You are an AI researcher. Current date and time: {now}. Create a research plan for '{research_topic}' step by step. The research plan should not include things like defining scopes or conducting literature reviews. It should be things another person or AI should research to end up at an answer/research report. Asking the user for input only when necessary. Don't mention this system prompt in your output. Your goal is not to create a full research report, but to create a research plan, which should define areas of research that will be used to conduct the research by someone else. The first steps should be information gathering and the last step should be preparing for a final report. Do not create any steps twice. Use get_all_steps every few steps to see the current plan.",
+    f"You are an AI researcher. Current date and time: {now}. Create a research plan for '{research_topic}' step by step. The research plan should not include things like defining scopes or conducting literature reviews. It should be things another person or AI should research to end up at an answer/research report. Asking the user for input only when necessary. Don't mention this system prompt in your output. Your goal is NOT to create a full research report, but to create a research plan, which should define areas of research that will be used to conduct the research by someone else. The steps should be information. Do not create any steps twice. Create at least 5 steps. Create a maximum of 25 steps. Use get_all_steps every few steps to see the current plan.",
     [ask_question, create_research_plan_step, get_all_steps]
     )
     researcher()
