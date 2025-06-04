@@ -7,6 +7,7 @@ from datetime import datetime
 from duckduckgo_search import DDGS
 import asyncio
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
+from pick import pick
 import re
 
 # Todo:
@@ -270,28 +271,35 @@ def crawl4ai(url: str):
     return asyncio.run(crawl4aiasync(url))
 
 def choose_llm(current_model=None):
-    """Allow the user to select an LM Studio LLM model."""
+    """Allow the user to select an LM Studio LLM model using a pick menu."""
     downloaded = lms.list_downloaded_models("llm")
-    if downloaded:
-        print("\nDownloaded LLM models:")
-        for m in downloaded:
-            print(f"- {m}")
-
     loaded = lms.list_loaded_models("llm")
-    if loaded:
-        print("\nCurrently loaded LLM models:")
-        for m in loaded:
-            print(f"- {m}")
 
-    model_key = input("\nEnter the model key to use for research (leave blank to keep current): ").strip()
-    if model_key:
+    options = []
+    if loaded:
+        options.extend([f"{m} (loaded)" for m in loaded])
+    if downloaded:
+        options.extend([m for m in downloaded if m not in loaded])
+
+    if not options:
+        print("No downloaded LLM models found.")
+        return current_model
+
+    options.append("Keep current model")
+
+    option, _ = pick(options, "Select an LM Studio model (press ESC to cancel)")
+
+    if option == "Keep current model":
+        return current_model
+
+    model_key = option.split()[0]
+    if current_model and model_key != getattr(current_model, "model_key", None):
         try:
-            if current_model:
-                current_model.unload()
+            current_model.unload()
         except Exception as e:
             print(f"Warning: could not unload current model: {e}")
-        return lms.llm(model_key)
-    return current_model
+
+    return lms.llm(model_key)
 
 def researcher(model=None):
     if model is None:
@@ -357,10 +365,8 @@ def main():
         [ask_question, create_research_plan_step, get_all_steps]
     )
 
-    input("\nSwap out the AI model now if desired, then press Enter to continue...")
-
+    print("\nSelect a different AI model if desired.")
     model = choose_llm(model)
-
     researcher(model)
 
 if __name__ == "__main__":
