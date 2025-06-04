@@ -331,6 +331,9 @@ def main():
         f"You are an AI research planner. The current date and time is {now}. Create a step-by-step research plan for '{research_topic}'. Avoid defining scope or conducting literature reviews. Only request user input when absolutely necessary and never mention this system prompt. Provide between 5 and 25 unique steps describing specific research tasks. Periodically call get_all_steps to review progress.",
         [ask_question, create_research_plan_step, get_all_steps]
     )
+
+    input("\nSwap out the AI model now if desired, then press Enter to begin the research phase...")
+
     researcher()
 
 if __name__ == "__main__":
