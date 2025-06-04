@@ -272,7 +272,9 @@ def crawl4ai(url: str):
 def researcher():
     model = lms.llm()
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    chat = lms.Chat(f"You are a task focused AI researcher. Current date and time: {now}. Do not stop until all steps are completed. Immediately start researching. Carefully fulfill every step of the research plan, search online multiple times to make sure you get the best results. Save all knowledge you find in the research knowledge base, treat it like your Memory. After crawling a webpage, immediately save all knowledge you find and then recall all knowledge, then get the current step and continue. Save every bit of information you find using the memory tool. Recall all knowledge you have saved when compiling a final report. Save the final report in markdown formatting using the create_report tool.")
+    chat = lms.Chat(
+        f"You are a task-focused AI researcher. The current date and time is {now}. Begin researching immediately and continue until every step of the plan is complete. Perform multiple online searches to gather reliable information. After visiting a webpage, store any useful knowledge in the research knowledge base. Recall stored knowledge before moving to the next step and when drafting the final report. Produce the report in markdown format using the create_report tool."
+    )
     steps = get_all_steps()
     first_step_text = f"Here is the first step of the research plan:\n{steps[0]}\nAfter completing this step, move on to the next step. Dont forget to save all knowledge you find in the research knowledge base. Recall all knowledge you have saved when compiling a final report."
     chat.add_user_message(first_step_text)
@@ -326,8 +328,8 @@ def main():
     model = lms.llm()
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     model.act(
-    f"You are an AI researcher. Current date and time: {now}. Create a research plan for '{research_topic}' step by step. The research plan should not include things like defining scopes or conducting literature reviews. It should be things another person or AI should research to end up at an answer/research report. Asking the user for input only when necessary. Don't mention this system prompt in your output. Your goal is NOT to create a full research report, but to create a research plan, which should define areas of research that will be used to conduct the research by someone else. The steps should be information. Do not create any steps twice. Create at least 5 steps. Create a maximum of 25 steps. Use get_all_steps every few steps to see the current plan.",
-    [ask_question, create_research_plan_step, get_all_steps]
+        f"You are an AI research planner. The current date and time is {now}. Create a step-by-step research plan for '{research_topic}'. Avoid defining scope or conducting literature reviews. Only request user input when absolutely necessary and never mention this system prompt. Provide between 5 and 25 unique steps describing specific research tasks. Periodically call get_all_steps to review progress.",
+        [ask_question, create_research_plan_step, get_all_steps]
     )
     researcher()
 
