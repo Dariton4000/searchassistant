@@ -269,8 +269,33 @@ def crawl4ai(url: str):
     print(f"Crawling {url}...")
     return asyncio.run(crawl4aiasync(url))
 
-def researcher():
-    model = lms.llm()
+def choose_llm(current_model=None):
+    """Allow the user to select an LM Studio LLM model."""
+    downloaded = lms.list_downloaded_models("llm")
+    if downloaded:
+        print("\nDownloaded LLM models:")
+        for m in downloaded:
+            print(f"- {m}")
+
+    loaded = lms.list_loaded_models("llm")
+    if loaded:
+        print("\nCurrently loaded LLM models:")
+        for m in loaded:
+            print(f"- {m}")
+
+    model_key = input("\nEnter the model key to use for research (leave blank to keep current): ").strip()
+    if model_key:
+        try:
+            if current_model:
+                current_model.unload()
+        except Exception as e:
+            print(f"Warning: could not unload current model: {e}")
+        return lms.llm(model_key)
+    return current_model
+
+def researcher(model=None):
+    if model is None:
+        model = lms.llm()
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     chat = lms.Chat(
         f"You are a task-focused AI researcher. The current date and time is {now}. Begin researching immediately and continue until every step of the plan is complete. Perform multiple online searches to gather reliable information. After visiting a webpage, store any useful knowledge in the research knowledge base. Recall stored knowledge before moving to the next step and when drafting the final report. Produce the report in markdown format using the create_report tool."
@@ -332,9 +357,11 @@ def main():
         [ask_question, create_research_plan_step, get_all_steps]
     )
 
-    input("\nSwap out the AI model now if desired, then press Enter to begin the research phase...")
+    input("\nSwap out the AI model now if desired, then press Enter to continue...")
 
-    researcher()
+    model = choose_llm(model)
+
+    researcher(model)
 
 if __name__ == "__main__":
     main()
