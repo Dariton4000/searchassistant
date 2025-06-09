@@ -144,6 +144,7 @@ def save_knowledge(knowledge: str) -> str:
 
 def get_all_knowledge() -> list:
     """Returns all entries in the knowledge base."""
+    print("Retrieving all knowledge entries")
     knowledge_file = Path("research_knowledge") / "knowledge.json"
     if not knowledge_file.exists():
         return []
@@ -273,10 +274,10 @@ def researcher():
     model = lms.llm()
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     chat = lms.Chat(
-        f"You are a task-focused AI researcher. The current date and time is {now}. Begin researching immediately and continue until every step of the plan is complete. Perform multiple online searches to gather reliable information. After visiting a webpage, store any useful knowledge in the research knowledge base. Recall stored knowledge before moving to the next step and when drafting the final report. Produce the report in markdown format using the create_report tool."
+        f"You are a task-focused AI researcher. The current date and time is {now}. Begin researching immediately and continue until every step of the plan is complete. Perform multiple online searches to gather reliable information. After visiting a webpage, store any useful knowledge in the research knowledge base. Recall stored knowledge before moving to the next step and when drafting the final report. Don't forget to ground information in reliable sources. Mark any assumptions clearly. Produce the report in markdown format using the create_report tool."
     )
     steps = get_all_steps()
-    first_step_text = f"Here is the first step of the research plan:\n{steps[0]}\nAfter completing this step, move on to the next step. Dont forget to save all knowledge you find in the research knowledge base. Recall all knowledge you have saved when compiling a final report."
+    first_step_text = f"Here is the first step of the research plan:\n{steps[0]}\nAfter completing this step, move on to the next step. Dont forget to save all knowledge you find in the research knowledge base. DO NOT stop until all steps are completed and a report has been created. Recall all knowledge you have saved when compiling a final report."
     chat.add_user_message(first_step_text)
 
     print("Bot: ", end="", flush=True)
