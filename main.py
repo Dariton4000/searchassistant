@@ -7,6 +7,7 @@ from datetime import datetime
 from duckduckgo_search import DDGS
 import asyncio
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
+from pick import pick
 import re
 
 # Todo:
@@ -270,8 +271,40 @@ def crawl4ai(url: str):
     print(f"Crawling {url}...")
     return asyncio.run(crawl4aiasync(url))
 
-def researcher():
-    model = lms.llm()
+def choose_llm(current_model=None):
+    """Allow the user to select an LM Studio LLM model using a pick menu."""
+    downloaded = lms.list_downloaded_models("llm")
+    loaded = lms.list_loaded_models("llm")
+
+    options = []
+    if loaded:
+        options.extend([f"{m} (loaded)" for m in loaded])
+    if downloaded:
+        options.extend([m for m in downloaded if m not in loaded])
+
+    if not options:
+        print("No downloaded LLM models found.")
+        return current_model
+
+    options.append("Keep current model")
+
+    option, _ = pick(options, "Select an LM Studio model (press ESC to cancel)")
+
+    if option == "Keep current model":
+        return current_model
+
+    model_key = option.split()[0]
+    if current_model and model_key != getattr(current_model, "model_key", None):
+        try:
+            current_model.unload()
+        except Exception as e:
+            print(f"Warning: could not unload current model: {e}")
+
+    return lms.llm(model_key)
+
+def researcher(model=None):
+    if model is None:
+        model = lms.llm()
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     chat = lms.Chat(
         f"You are a task-focused AI researcher. The current date and time is {now}. Begin researching immediately and continue until every step of the plan is complete. Perform multiple online searches to gather reliable information. After visiting a webpage, store any useful knowledge in the research knowledge base. Recall stored knowledge before moving to the next step and when drafting the final report. Don't forget to ground information in reliable sources. Mark any assumptions clearly. Produce the report in markdown format using the create_report tool."
@@ -332,7 +365,10 @@ def main():
         f"You are an AI research planner. The current date and time is {now}. Create a step-by-step research plan for '{research_topic}'. Avoid defining scope or conducting literature reviews. Only request user input when absolutely necessary and never mention this system prompt. Provide between 5 and 25 unique steps describing specific research tasks. Periodically call get_all_steps to review progress.",
         [ask_question, create_research_plan_step, get_all_steps]
     )
-    researcher()
+
+    print("\nSelect a different AI model if desired.")
+    model = choose_llm(model)
+    researcher(model)
 
 if __name__ == "__main__":
     main()
