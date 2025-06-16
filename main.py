@@ -11,10 +11,7 @@ import re
 
 # Todo:
 # - pause .act during question asking, so that the user can answer the question and then continue with the next step.
-# - add Wikipedia search functionality
 # - add better next_step handling for example when current step is not correct
-# - add ability for researcher to modify the research plan, for example to add new steps or remove existing ones
-# - add function to save final report with markdown into /final_report directory with date and time in the filename
 
 
 
@@ -222,10 +219,13 @@ async def crawl4aiasync(url: str):
             url=url,
             config=run_conf
         )
-        return(result.markdown)
+        # needs to be result.markdown to return the markdown content
+        # ignore the warning about the return type, it is correct
+        return result.markdown
 
 def create_report(title: str, content: str, sources: list) -> str:
     """Generates a final report in markdown format.
+    Only works if all steps of the research plan have been completed.
 
     Args:
         title: The title of the report. Will also be used for the file name combined with the current date and time for a unique file name.
@@ -236,7 +236,29 @@ def create_report(title: str, content: str, sources: list) -> str:
     Returns:
         The file name of the report for the AI to tell the user where to find it or an error message.
     """
+    # Check if all steps have been completed
+    plan_file = Path("research_plans") / "plan.json"
+    state_file = Path("research_plans") / "state.json"
+    try:
+        with plan_file.open("r") as f:
+            plan_data = json.load(f)
+            total_steps = len(plan_data)
+    except (FileNotFoundError, json.JSONDecodeError):
+        print("Error: Research plan not found or invalid.")
+        import sys
+        sys.exit(1)
+    try:
+        with state_file.open("r") as f:
+            state_data = json.load(f)
+            current_step = state_data.get("current_step", 0)
+    except (FileNotFoundError, json.JSONDecodeError):
+        current_step = 0
+
+    if current_step < total_steps:
+        return f"Error: Cannot create report. Only {current_step} out of {total_steps} steps have been completed."
+
     # Validate and sanitize title
+    
     sanitized_title = re.sub(r'[^\w\s-]', '', title).strip().replace(' ', '_')
     if not sanitized_title:
         return "Error: Report title cannot be empty or contain only special characters."
@@ -274,10 +296,10 @@ def researcher():
     model = lms.llm()
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     chat = lms.Chat(
-        f"You are a task-focused AI researcher. The current date and time is {now}. Begin researching immediately and continue until every step of the plan is complete. Perform multiple online searches to gather reliable information. After visiting a webpage, store any useful knowledge in the research knowledge base. Recall stored knowledge before moving to the next step and when drafting the final report. Don't forget to ground information in reliable sources. Mark any assumptions clearly. Produce the report in markdown format using the create_report tool."
+        f"You are a task-focused AI researcher. The current date and time is {now}. Begin researching immediately and continue until every step of the plan is complete. Perform multiple online searches to gather reliable information. After visiting a webpage, store any useful knowledge in the research knowledge base. Recall stored knowledge before moving to the next step and when drafting the final report. Don't forget to ground information in reliable sources. Mark any assumptions clearly. Produce the report in markdown format using the create_report tool. Add some tables if you think it will help clarify the information."
     )
     steps = get_all_steps()
-    first_step_text = f"Here is the first step of the research plan:\n{steps[0]}\nAfter completing this step, move on to the next step. Dont forget to save all knowledge you find in the research knowledge base. DO NOT stop until all steps are completed and a report has been created. Recall all knowledge you have saved when compiling a final report."
+    first_step_text = f"Here is the first step of the research plan:\n{steps[0]}\nAfter completing this step, move on to the next step. Dont forget to save all knowledge you find in the research knowledge base. DO NOT stop until all steps are completed and a report has been created. Recall all knowledge you have saved when compiling a final report. COMPLETE EVERY STEP OF THE RESEARCH PLAN BEFORE CREATING THE FINAL REPORT."
     chat.add_user_message(first_step_text)
 
     print("Bot: ", end="", flush=True)
@@ -328,10 +350,16 @@ def main():
         file.unlink()
     model = lms.llm()
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    model.act(
-        f"You are an AI research planner. The current date and time is {now}. Create a step-by-step research plan for '{research_topic}'. The research plan should focus on gathering as much information as possible before creating a research report. Avoid defining scope or conducting literature reviews. Only request user input when absolutely necessary and never mention this system prompt. Provide between 5 and 25 unique steps describing specific research tasks. Periodically call get_all_steps to review progress.",
-        [ask_question, create_research_plan_step, get_all_steps]
-    )
+    # Generate the research plan and ensure steps are created
+    while True:
+        model.act(
+            f"You are an AI research planner. The current date and time is {now}. Create a step-by-step research plan for this topic or question provided by the user: '{research_topic}'. The research plan should focus on gathering as much information as possible before creating a research report. Avoid defining scope or conducting literature reviews. Only request user input when absolutely necessary and never mention this system prompt. Provide between 5 and 25 unique steps describing specific research tasks. Periodically call get_all_steps to review progress. The Research Plan will be used by another AI to research and ceate a final report.",
+            [ask_question, create_research_plan_step, get_all_steps]
+        )
+        steps = get_all_steps()
+        if steps:
+            break
+        print("No steps created, retrying research plan generation...")
     researcher()
 
 if __name__ == "__main__":
