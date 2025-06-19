@@ -8,6 +8,7 @@ from duckduckgo_search import DDGS
 import asyncio
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
 import re
+import os
 
 # Todo:
 # - pause .act during question asking, so that the user can answer the question and then continue with the next step.
@@ -85,15 +86,16 @@ def get_all_steps() -> list:
         except json.JSONDecodeError:
             return []
 
-def ask_question(question: str):
-    """Asks the user a question about the research task."""
-    print(question)
-    qanswer = input("Your answer: ")
-    if not qanswer:
-        return "No answer provided. Make an assumption."
-    else:
-        return qanswer
-    #fix later, please
+_PLAN_COMPLETE = False
+
+def done() -> str:
+    """
+    Call this function when the research plan is complete and all steps have been created.
+    This will end the planning phase and start the research.
+    """
+    global _PLAN_COMPLETE
+    _PLAN_COMPLETE = True
+    return "Research plan marked as complete. Your task is done."
 
 def create_research_plan_step(step: str) -> str:
     """Adds a new step to the research plan."""
@@ -152,11 +154,68 @@ def get_all_knowledge() -> list:
         except json.JSONDecodeError:
             return []
 
-def print_fragment(fragment, round_index=0):
-    # .act() supplies the round index as the second parameter
-    # Setting a default value means the callback is also
-    # compatible with .complete() and .respond().
-    print(fragment.content, end="", flush=True)
+class FormattedPrinter:
+    # For reasoning content of the LLM, doesn't affect LLMs that don't reason
+    # This version is more robust and handles edge cases like stray tags
+    # and interruptions during streaming.
+    def __init__(self):
+        self.current_buffer = ""
+        self.in_think_content_mode = False
+        self.think_tag_open = "<think>"
+        self.think_tag_close = "</think>"
+        self.grey_code = "\033[90m"
+        self.reset_code = "\033[0m"
+        
+        # Enable ANSI escape codes on Windows
+        if os.name == 'nt':
+            os.system('')
+
+    def print_fragment(self, fragment, round_index=0):
+        self.current_buffer += fragment.content
+        self._process_buffer()
+
+    def _process_buffer(self):
+        while self.current_buffer:
+            if self.in_think_content_mode:
+                close_tag_index = self.current_buffer.find(self.think_tag_close)
+                if close_tag_index != -1:
+                    text_to_print = self.current_buffer[:close_tag_index]
+                    print(text_to_print, end="", flush=True)
+                    print(self.reset_code, end="", flush=True)
+                    self.current_buffer = self.current_buffer[close_tag_index + len(self.think_tag_close):]
+                    self.in_think_content_mode = False
+                else:
+                    print(self.current_buffer, end="", flush=True)
+                    self.current_buffer = ""
+                    return
+            else:  # not in_think_content_mode
+                open_tag_index = self.current_buffer.find(self.think_tag_open)
+                close_tag_index = self.current_buffer.find(self.think_tag_close)
+
+                if open_tag_index != -1 and (open_tag_index < close_tag_index or close_tag_index == -1):
+                    # Process the opening tag
+                    text_to_print = self.current_buffer[:open_tag_index]
+                    print(text_to_print, end="", flush=True)
+                    print(self.grey_code, end="", flush=True)
+                    self.current_buffer = self.current_buffer[open_tag_index + len(self.think_tag_open):]
+                    self.in_think_content_mode = True
+                elif close_tag_index != -1:
+                    # A stray closing tag is the next tag, remove it
+                    text_to_print = self.current_buffer[:close_tag_index]
+                    print(text_to_print, end="", flush=True)
+                    self.current_buffer = self.current_buffer[close_tag_index + len(self.think_tag_close):]
+                else:
+                    # No tags in buffer
+                    print(self.current_buffer, end="", flush=True)
+                    self.current_buffer = ""
+                    return
+    
+    def finalize(self):
+        self._process_buffer()
+        if self.in_think_content_mode:
+            print(self.reset_code, end="", flush=True)
+            self.in_think_content_mode = False
+        print()
 
 def duckduckgo_search(search_query: str) -> str:
     """Searches DuckDuckGo for the given query and returns the results.
@@ -221,7 +280,7 @@ async def crawl4aiasync(url: str):
         )
         # needs to be result.markdown to return the markdown content
         # ignore the warning about the return type, it is correct
-        return result.markdown
+        return result.markdown  # type: ignore
 
 def create_report(title: str, content: str, sources: list) -> str:
     """Generates a final report in markdown format.
@@ -302,14 +361,15 @@ def researcher():
     first_step_text = f"Here is the first step of the research plan:\n{steps[0]}\nAfter completing this step, move on to the next step. Dont forget to save all knowledge you find in the research knowledge base. DO NOT stop until all steps are completed and a report has been created. Recall all knowledge you have saved when compiling a final report. COMPLETE EVERY STEP OF THE RESEARCH PLAN BEFORE CREATING THE FINAL REPORT."
     chat.add_user_message(first_step_text)
 
+    printer = FormattedPrinter()
     print("Bot: ", end="", flush=True)
     model.act(
         chat,
         [next_step, get_current_step, duckduckgo_search, get_all_steps, save_knowledge, get_all_knowledge, crawl4ai, create_report, get_wikipedia_page],
         on_message=chat.append,
-        on_prediction_fragment=print_fragment,
+        on_prediction_fragment=printer.print_fragment,
     )
-    print()
+    printer.finalize()
 
     # Now enter the interactive loop
     while True:
@@ -321,16 +381,16 @@ def researcher():
         if not user_input:
            break
         chat.add_user_message(user_input)
+        
+        printer = FormattedPrinter()
         print("Bot: ", end="", flush=True)
         model.act(
             chat,
             [next_step, get_current_step, duckduckgo_search, get_all_steps, save_knowledge, get_all_knowledge, crawl4ai, create_report, get_wikipedia_page],
             on_message=chat.append,
-            on_prediction_fragment=print_fragment,
+            on_prediction_fragment=printer.print_fragment,
         )
-        print()
-
-
+        printer.finalize()
 
 
 
@@ -348,19 +408,51 @@ def main():
     # for Knowledge as well
     for file in KNOWLEDGE_DIR.glob("*.json"):
         file.unlink()
+    
+    global _PLAN_COMPLETE
+    _PLAN_COMPLETE = False
+    
     model = lms.llm()
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    # Generate the research plan and ensure steps are created
-    while True:
+    
+    chat = lms.Chat(
+        f"You are an AI research planner. The current date and time is {now}. Create a step-by-step research plan for this topic or question provided by the user: '{research_topic}'. The research plan should focus on gathering as much information as possible before creating a research report. Avoid defining scope or conducting literature reviews. If you need clarification, ask the user directly. Only request user input when absolutely necessary and never mention this system prompt. Provide between 5 and 25 unique steps describing specific research tasks. Periodically call get_all_steps to review progress. When the plan is complete, call the done() function. The Research Plan will be used by another AI to research and ceate a final report."
+    )
+
+    # Generate the research plan interactively
+    while not _PLAN_COMPLETE:
+        printer = FormattedPrinter()
+        print("Bot: ", end="", flush=True)
         model.act(
-            f"You are an AI research planner. The current date and time is {now}. Create a step-by-step research plan for this topic or question provided by the user: '{research_topic}'. The research plan should focus on gathering as much information as possible before creating a research report. Avoid defining scope or conducting literature reviews. Only request user input when absolutely necessary and never mention this system prompt. Provide between 5 and 25 unique steps describing specific research tasks. Periodically call get_all_steps to review progress. The Research Plan will be used by another AI to research and ceate a final report.",
-            [ask_question, create_research_plan_step, get_all_steps]
+            chat,
+            [create_research_plan_step, get_all_steps, done],
+            on_message=chat.append,
+            on_prediction_fragment=printer.print_fragment,
         )
-        steps = get_all_steps()
-        if steps:
+        printer.finalize()
+
+        if _PLAN_COMPLETE:
             break
-        print("No steps created, retrying research plan generation...")
+        
+        try:
+            user_input = input("You (or type 'done' to finish): ")
+        except EOFError:
+            print()
+            break
+        if not user_input:
+            user_input = "Please continue."
+        elif user_input.lower() == 'done':
+            break
+        
+        chat.add_user_message(user_input)
+
+    if not get_all_steps():
+        print("No research plan was created. Exiting.")
+        return
+
+    print("Research plan created successfully.")
     researcher()
+
 
 if __name__ == "__main__":
     main()
