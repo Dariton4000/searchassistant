@@ -1,4 +1,4 @@
-lmstudio>=1.3.1
+lmstudio>=1.3.2
 requests>=2.32.3
 beautifulsoup4>=4.13.4
 duckduckgo-search>=8.0.2
