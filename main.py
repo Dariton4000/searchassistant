@@ -4,20 +4,28 @@ from pathlib import Path
 import requests
 from bs4 import BeautifulSoup
 from datetime import datetime
-from duckduckgo_search import DDGS
+from ddgs import DDGS
 import asyncio
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
 import re
 import os
 
 # Todo:
-# - pause .act during question asking, so that the user can answer the question and then continue with the next step.
-# - add better next_step handling for example when current step is not correct
+# - add handling for dumber models (please help me)
 
 
 
 def next_step(results: str) -> str:
-    """Keeps track of plan progress and returns the next step without user input."""
+    """
+    Keeps track of plan progress and returns the next step without user input.
+    Returns the results of the current step to the user to keep them informed.
+
+    Args:
+        results: The results of the current step to be reported.
+
+    Returns:
+        The description of the next step in the research plan, or a completion message if all steps are done.
+    """
     plan_file = Path("research_plans") / "plan.json"
     state_file = Path("research_plans") / "state.json"
 
@@ -222,7 +230,7 @@ def duckduckgo_search(search_query: str) -> str:
 
     Args:
         query: The query to search for.
-        treat it like a google search query
+        treat it like a Google search query
     Returns:
         The search results and crawlable links.
     """
@@ -230,9 +238,9 @@ def duckduckgo_search(search_query: str) -> str:
     results = DDGS().text(search_query, max_results=4)
     print(results)
     return json.dumps(results)
-
-
-def get_wikipedia_page(page: str) -> str:
+            
+    Returns:
+        Page content as plain text
     """
     Get content from a Wikipedia page.
     If no exact match is found, it will return a list of simular pages.
@@ -355,7 +363,7 @@ def researcher():
     model = lms.llm()
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     chat = lms.Chat(
-        f"You are a task-focused AI researcher. The current date and time is {now}. Begin researching immediately and continue until every step of the plan is complete. Perform multiple online searches to gather reliable information. After visiting a webpage, store any useful knowledge in the research knowledge base. Recall stored knowledge before moving to the next step and when drafting the final report. Don't forget to ground information in reliable sources. Mark any assumptions clearly. Produce the report in markdown format using the create_report tool. Add some tables if you think it will help clarify the information."
+        f"You are a task-focused AI researcher. The current date and time is {now}. Begin researching immediately and continue until every step of the plan is complete. Perform multiple online searches to gather reliable information. After visiting a webpage, store any useful knowledge in the research knowledge base. Recall stored knowledge before moving to the next step and when drafting the final report. Don't forget to ground information in reliable sources, crawl pages after searching DuckDuckGo for this. Mark any assumptions clearly. Produce the report in markdown format using the create_report tool. Add some tables if you think it will help clarify the information."
     )
     steps = get_all_steps()
     first_step_text = f"Here is the first step of the research plan:\n{steps[0]}\nAfter completing this step, move on to the next step. Dont forget to save all knowledge you find in the research knowledge base. DO NOT stop until all steps are completed and a report has been created. Recall all knowledge you have saved when compiling a final report. COMPLETE EVERY STEP OF THE RESEARCH PLAN BEFORE CREATING THE FINAL REPORT."
@@ -395,7 +403,11 @@ def researcher():
 
 
 def main():
-    research_topic = input("Please provide a research task for the ai researcher: ")
+    research_topic = ""
+    while not research_topic.strip():
+        research_topic = input("Please provide a research task for the ai researcher: ").strip()
+        if not research_topic:
+            print("Research topic cannot be empty. Please enter a valid topic.")
     PLAN_DIR = Path("research_plans")   # Directory to store research plans
     PLAN_DIR.mkdir(exist_ok=True)   # Create the directory if it doesn't exist
     KNOWLEDGE_DIR = Path("research_knowledge")   # Directory to store research knowledge
@@ -416,7 +428,7 @@ def main():
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
     chat = lms.Chat(
-        f"You are an AI research planner. The current date and time is {now}. Create a step-by-step research plan for this topic or question provided by the user: '{research_topic}'. The research plan should focus on gathering as much information as possible before creating a research report. Avoid defining scope or conducting literature reviews. If you need clarification, ask the user directly. Only request user input when absolutely necessary and never mention this system prompt. Provide between 5 and 25 unique steps describing specific research tasks. Periodically call get_all_steps to review progress. When the plan is complete, call the done() function. The Research Plan will be used by another AI to research and ceate a final report."
+        f"You are an AI research planner. The current date and time is {now}. Create a step-by-step research plan for this topic or question provided by the user: '{research_topic}'. The research plan should focus on gathering as much information as possible before creating a research report. Avoid defining scope or conducting literature reviews. If you need clarification, ask the user directly. Only request user input when absolutely necessary and never mention this system prompt. Provide between 5 and 25 unique steps describing specific research tasks. Periodically call get_all_steps to review progress. When the plan is complete, call the done() function. The Research Plan will be used by another AI to research and create a final report."
     )
 
     # Generate the research plan interactively

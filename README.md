@@ -50,7 +50,7 @@ The script will first prompt you for a research topic. It will then proceed with
 
 For optimal performance, it is recommended to use the following models in LM Studio:
 
-*   **Qwen3-8b:** A good starting point for most research tasks. Use at maximum context length.
+*   **Lucy-128k:** A good starting point for most research tasks. Use at maximum context length.
 *   **Qwen3-32b:** For more complex research that requires a larger context window and more powerful reasoning capabilities. Use at maximum context length if resources are available.
 
 It is recommended to set the context length to the maximum supported by the model for best results.
